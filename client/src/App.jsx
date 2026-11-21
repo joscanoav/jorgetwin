@@ -12,8 +12,8 @@ const HALO_STYLES = {
 const UI = {
   es: {
     title: 'Habla con Jorge',
-    subtitle: 'Ciencias de la Computación · ESO y Bachillerato',
-    notice: 'Soy una IA, clon de Jorge. No escribas datos personales.',
+    tagline: 'Informática y programación',
+    notice: 'Soy una IA, clon de Jorge. No compartas datos personales.',
     voiceOnlyNotice: 'La voz solo funciona en Chrome o Edge.',
     language: 'Idioma',
     ready: 'Listo',
@@ -23,6 +23,7 @@ const UI = {
     start: 'Hablar con Jorge',
     hangUp: 'Colgar',
     mute: 'Silenciar',
+    muted: 'Silenciado',
     you: 'Tú:',
     hint: 'Pulsa el micrófono para empezar a hablar con Jorge.',
     placeholder: 'O escribe tu pregunta…',
@@ -36,7 +37,7 @@ const UI = {
   },
   en: {
     title: 'Talk to Jorge',
-    subtitle: 'Computer Science · Secondary and Sixth Form',
+    tagline: 'Computing and programming',
     notice: "I'm an AI, Jorge's clone. Don't share personal details.",
     voiceOnlyNotice: 'Voice only works in Chrome or Edge.',
     language: 'Language',
@@ -47,6 +48,7 @@ const UI = {
     start: 'Talk to Jorge',
     hangUp: 'Hang up',
     mute: 'Mute',
+    muted: 'Muted',
     you: 'You:',
     hint: 'Press the microphone to start talking to Jorge.',
     placeholder: 'Or type your question…',
@@ -60,8 +62,8 @@ const UI = {
   },
   fr: {
     title: 'Parler à Jorge',
-    subtitle: 'Informatique · Collège et Lycée',
-    notice: "Je suis une IA, un clone de Jorge. N'écrivez pas de données personnelles.",
+    tagline: 'Informatique et programmation',
+    notice: 'Je suis une IA, le clone de Jorge. Ne partagez pas de données personnelles.',
     voiceOnlyNotice: 'La voix ne fonctionne que sur Chrome ou Edge.',
     language: 'Langue',
     ready: 'Prêt',
@@ -71,6 +73,7 @@ const UI = {
     start: 'Parler à Jorge',
     hangUp: 'Raccrocher',
     mute: 'Couper le son',
+    muted: 'Son coupé',
     you: 'Vous :',
     hint: 'Appuyez sur le micro pour commencer à parler à Jorge.',
     placeholder: 'Ou écrivez votre question…',
@@ -115,6 +118,16 @@ function HangUpIcon() {
   );
 }
 
+function SpeakerIcon({ muted }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-6 w-6">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 9.5h3l4-3.5v12l-4-3.5H4z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 9a4 4 0 0 1 0 6" />
+      {muted && <path strokeLinecap="round" d="M4 4l16 16" />}
+    </svg>
+  );
+}
+
 function SendIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
@@ -143,21 +156,19 @@ export default function App() {
         {ui.notice}
       </div>
 
-      <main className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center overflow-hidden px-4 pb-3 pt-2">
-        <div className="relative flex w-full shrink-0 items-start justify-center">
-          <div className="text-center">
-            <h1 className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-300">{ui.title}</h1>
-            <p className="mt-0.5 text-[10px] text-slate-500">{ui.subtitle}</p>
-          </div>
-          <div className="absolute right-0 top-0" role="group" aria-label={ui.language}>
-            <div className="flex gap-0.5 rounded-full border border-white/10 bg-white/5 p-0.5">
+      <main className="safe-bottom mx-auto flex w-full max-w-xl flex-1 flex-col items-center overflow-hidden px-3 pt-2">
+        <div className="w-full shrink-0 text-center">
+          <h1 className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-300">{ui.title}</h1>
+          <p className="mt-0.5 text-[10px] text-slate-500">{ui.tagline}</p>
+          <div className="mt-2 flex justify-center" role="group" aria-label={ui.language}>
+            <div className="flex gap-1 rounded-full border border-white/10 bg-white/5 p-0.5">
               {LANGUAGES.map((code) => (
                 <button
                   key={code}
                   type="button"
                   onClick={() => chat.changeLanguage(code)}
                   aria-pressed={chat.lang === code}
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-medium tracking-wide transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${
+                  className={`flex h-11 w-11 items-center justify-center rounded-full text-[11px] font-medium tracking-wide transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${
                     chat.lang === code ? 'bg-cyan-500/90 text-slate-950' : 'text-slate-400 hover:text-slate-100'
                   }`}
                 >
@@ -168,14 +179,14 @@ export default function App() {
           </div>
         </div>
 
-        <div className="avatar-slot relative mt-2 flex min-h-0 w-full flex-1 items-center justify-center">
+        <div className="avatar-slot relative mt-1 flex min-h-0 w-full flex-1 items-center justify-center">
           <div className={`avatar-fit relative aspect-[36/55]`}>
             <div className={`pointer-events-none absolute -inset-3 rounded-[2.5rem] blur-md transition-colors duration-500 ${HALO_STYLES[haloState(chat)]}`} />
             <AvatarVideo isSpeaking={chat.isSpeaking} />
           </div>
         </div>
 
-        <div className="mt-1 flex h-5 shrink-0 items-end justify-center gap-1.5" aria-hidden="true">
+        <div className="mt-1 flex h-4 shrink-0 items-end justify-center gap-1.5" aria-hidden="true">
           {chat.isSpeaking && [0, 1, 2, 3, 4].map((index) => (
             <span
               key={index}
@@ -185,22 +196,22 @@ export default function App() {
           ))}
         </div>
 
-        <p className="mt-0.5 text-center text-[11px] text-slate-400" aria-live="polite">{statusLabel(chat, ui)}</p>
+        <p className="mt-2 text-center text-[11px] text-slate-400" aria-live="polite">{statusLabel(chat, ui)}</p>
 
-        <p className="mt-0.5 h-5 max-w-full truncate text-center text-[11px] italic text-slate-500" aria-live="off">
+        <p className="mt-2 h-5 max-w-full truncate text-center text-[11px] italic text-slate-500" aria-live="off">
           {userLine ? `${ui.you} ${userLine}` : ''}
         </p>
 
-        <p className="line-clamp-3 mt-1 max-w-md text-center text-xs leading-snug text-slate-300" aria-live="polite">
+        <p className="line-clamp-3 mt-2 max-w-md text-center text-xs leading-snug text-slate-300" aria-live="polite">
           {chat.lastReply || ui.hint}
         </p>
 
-        <div className="mt-2 flex shrink-0 items-center justify-center gap-3">
+        <div className="mt-4 flex shrink-0 items-center justify-center gap-6">
           <button
             type="button"
             onClick={chat.isActive ? chat.hangUp : chat.startConversation}
             aria-label={chat.isActive ? ui.hangUp : ui.start}
-            className={`flex h-14 w-14 items-center justify-center rounded-full shadow-lg shadow-black/30 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
+            className={`flex h-[72px] w-[72px] items-center justify-center rounded-full shadow-lg shadow-black/30 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
               chat.isActive
                 ? 'bg-rose-500/90 text-white hover:bg-rose-500'
                 : 'bg-cyan-500 text-slate-950 hover:bg-cyan-400'
@@ -212,9 +223,10 @@ export default function App() {
             type="button"
             onClick={chat.stopAudio}
             disabled={!chat.isSpeaking}
-            className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-slate-300 transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:opacity-40 disabled:hover:bg-white/5"
+            aria-label={chat.isSpeaking ? ui.mute : ui.muted}
+            className="flex h-[52px] w-[52px] items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-300 transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:opacity-40 disabled:hover:bg-white/5"
           >
-            {ui.mute}
+            <SpeakerIcon muted={!chat.isSpeaking} />
           </button>
         </div>
 

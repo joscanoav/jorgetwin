@@ -11,12 +11,23 @@ const rootDir = path.resolve(__dirname, '..');
 const clientDist = path.join(rootDir, 'client', 'dist');
 const indexHtml = path.join(clientDist, 'index.html');
 
+const promptsDir = path.join(__dirname, 'prompts');
 const [jorgePrompt, temarioPrompt] = await Promise.all([
-  readFile(path.join(__dirname, 'prompts', 'jorge.md'), 'utf8'),
-  readFile(path.join(__dirname, 'prompts', 'temario.md'), 'utf8'),
+  readFile(path.join(promptsDir, 'jorge.md'), 'utf8'),
+  readFile(path.join(promptsDir, 'temario.md'), 'utf8'),
 ]);
 
-const SYSTEM_PROMPT = `${jorgePrompt.trim()}\n\n${temarioPrompt.trim()}`;
+let perfilPrompt = '';
+try {
+  perfilPrompt = await readFile(path.join(promptsDir, 'perfil.md'), 'utf8');
+} catch (err) {
+  if (err?.code === 'ENOENT') console.warn('[prompts] falta server/prompts/perfil.md; se continúa sin él');
+  else console.warn('[prompts] no se pudo leer perfil.md; se continúa sin él');
+}
+
+const SYSTEM_PROMPT = [jorgePrompt.trim(), perfilPrompt.trim(), temarioPrompt.trim()]
+  .filter(Boolean)
+  .join('\n\n');
 
 const ttsModule = await import('msedge-tts');
 const MsEdgeTTS = ttsModule.MsEdgeTTS ?? ttsModule.default?.MsEdgeTTS;

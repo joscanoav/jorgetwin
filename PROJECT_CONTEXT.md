@@ -5,8 +5,9 @@ Enlace web donde un alumno entra, ve mi cara, oye "Hola, ¿qué tal? Soy Jorge, 
 
 ## Stack (decidido)
 - Un solo servicio en Render (free) que sirve API + frontend. Sin Netlify.
-- Backend: Node 18+, Express 5, groq-sdk, msedge-tts (es-ES-AlvaroNeural), express-rate-limit, dotenv.
-- Frontend: React + Vite + TailwindCSS. Web Speech API (STT, solo Chrome/Edge) + campo de texto como alternativa.
+- Backend: Node 18+, Express 5, groq-sdk, msedge-tts (es-ES-AlvaroNeural, en-GB-RyanNeural, fr-FR-HenriNeural), express-rate-limit, dotenv.
+- Frontend: React + Vite + TailwindCSS. Web Speech API (STT, solo Chrome/Edge) + campo de texto únicamente como alternativa si el navegador no soporta SpeechRecognition.
+- Reconocimiento de voz: Google (Chrome) o Microsoft (Edge). Mejor comportamiento observado en Edge para inglés.
 - LLM: Groq, modelo por variable GROQ_MODEL (por defecto openai/gpt-oss-20b; alternativa openai/gpt-oss-120b). reasoning_effort "low".
 - Sin base de datos. Sin persistencia. No se guardan conversaciones.
 
@@ -15,9 +16,9 @@ Enlace web donde un alumno entra, ve mi cara, oye "Hola, ¿qué tal? Soy Jorge, 
 /client (Vite) · /reference (server.js y useVoiceChat.js del proyecto anterior, solo consulta)
 
 ## Contrato de la API
-POST /api/chat  { message, history } → { text, audioBase64 | null }
+POST /api/chat  { message, history, lang? } → { text, audioBase64 | null }
 GET /health → 200
-Validación: message ≤ 500 chars; history solo roles user/assistant, máx. 6 mensajes de ≤ 500 chars; rate limit por IP.
+Validación: message ≤ 500 chars; history solo roles user/assistant, máx. 6 mensajes de ≤ 500 chars; lang opcional "es" | "en" | "fr" (por defecto "es"; otro valor → 400); rate limit por IP.
 
 ## Avatar (Fase 1)
 Imagen fija en reposo + vídeo MP4 corto mío hablando (HeyGen), mudo y en bucle mientras isSpeaking. Sin sincronización real.

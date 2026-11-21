@@ -14,6 +14,7 @@ const UI = {
     title: 'Habla con Jorge',
     subtitle: 'Ciencias de la Computación · ESO y Bachillerato',
     notice: 'Soy una IA, clon de Jorge. No escribas datos personales.',
+    voiceOnlyNotice: 'La voz solo funciona en Chrome o Edge.',
     language: 'Idioma',
     ready: 'Listo',
     listening: 'Te escucho…',
@@ -22,17 +23,14 @@ const UI = {
     start: 'Hablar con Jorge',
     hangUp: 'Colgar',
     mute: 'Silenciar',
-    placeholder: 'O escribe tu pregunta…',
+    you: 'Tú:',
     hint: 'Pulsa el micrófono para empezar a hablar con Jorge.',
-    viewHistory: 'Ver conversación',
-    hideHistory: 'Ocultar conversación',
-    emptyHistory: 'Aún no hay conversación.',
-    you: 'Tú',
+    placeholder: 'O escribe tu pregunta…',
     send: 'Enviar',
     errors: {
-      speechUnsupported: 'Tu navegador no soporta reconocimiento de voz. Usa Chrome o Edge, o escribe tu pregunta.',
-      micDenied: 'Permiso de micrófono denegado. Puedes usar el campo de texto.',
-      micError: 'Hubo un problema con el micrófono. Puedes usar el campo de texto.',
+      micDenied: 'Permiso de micrófono denegado. Actívalo para hablar con Jorge.',
+      micError: 'Hubo un problema con el micrófono. Inténtalo de nuevo.',
+      languageNotSupported: 'El navegador no admite el idioma seleccionado para la voz.',
       connection: 'No se pudo conectar con Jorge. Inténtalo de nuevo.',
     },
   },
@@ -40,6 +38,7 @@ const UI = {
     title: 'Talk to Jorge',
     subtitle: 'Computer Science · Secondary and Sixth Form',
     notice: "I'm an AI, Jorge's clone. Don't share personal details.",
+    voiceOnlyNotice: 'Voice only works in Chrome or Edge.',
     language: 'Language',
     ready: 'Ready',
     listening: "I'm listening…",
@@ -48,17 +47,14 @@ const UI = {
     start: 'Talk to Jorge',
     hangUp: 'Hang up',
     mute: 'Mute',
-    placeholder: 'Or type your question…',
+    you: 'You:',
     hint: 'Press the microphone to start talking to Jorge.',
-    viewHistory: 'View conversation',
-    hideHistory: 'Hide conversation',
-    emptyHistory: 'No conversation yet.',
-    you: 'You',
+    placeholder: 'Or type your question…',
     send: 'Send',
     errors: {
-      speechUnsupported: 'Your browser does not support voice recognition. Use Chrome or Edge, or type your question.',
-      micDenied: 'Microphone permission denied. You can use the text field.',
-      micError: 'There was a problem with the microphone. You can use the text field.',
+      micDenied: 'Microphone permission denied. Enable it to talk to Jorge.',
+      micError: 'There was a problem with the microphone. Please try again.',
+      languageNotSupported: 'The browser does not support the selected language for voice recognition.',
       connection: 'Could not connect to Jorge. Please try again.',
     },
   },
@@ -66,6 +62,7 @@ const UI = {
     title: 'Parler à Jorge',
     subtitle: 'Informatique · Collège et Lycée',
     notice: "Je suis une IA, un clone de Jorge. N'écrivez pas de données personnelles.",
+    voiceOnlyNotice: 'La voix ne fonctionne que sur Chrome ou Edge.',
     language: 'Langue',
     ready: 'Prêt',
     listening: 'Je vous écoute…',
@@ -74,25 +71,22 @@ const UI = {
     start: 'Parler à Jorge',
     hangUp: 'Raccrocher',
     mute: 'Couper le son',
-    placeholder: 'Ou écrivez votre question…',
+    you: 'Vous :',
     hint: 'Appuyez sur le micro pour commencer à parler à Jorge.',
-    viewHistory: 'Voir la conversation',
-    hideHistory: 'Masquer la conversation',
-    emptyHistory: "Aucune conversation pour l'instant.",
-    you: 'Vous',
+    placeholder: 'Ou écrivez votre question…',
     send: 'Envoyer',
     errors: {
-      speechUnsupported: "Votre navigateur ne prend pas en charge la reconnaissance vocale. Utilisez Chrome ou Edge, ou écrivez votre question.",
-      micDenied: "Autorisation du micro refusée. Vous pouvez utiliser le champ de texte.",
-      micError: "Il y a eu un problème avec le micro. Vous pouvez utiliser le champ de texte.",
+      micDenied: 'Autorisation du micro refusée. Activez-la pour parler à Jorge.',
+      micError: "Il y a eu un problème avec le micro. Réessayez.",
+      languageNotSupported: "Le navigateur ne prend pas en charge la langue sélectionnée pour la reconnaissance vocale.",
       connection: "Impossible de se connecter à Jorge. Réessayez.",
     },
   },
 };
 
 function statusLabel(chat, ui) {
-  if (chat.isThinking) return ui.thinking;
   if (chat.isSpeaking) return ui.speaking;
+  if (chat.isThinking) return ui.thinking;
   if (chat.isListening) return ui.listening;
   return ui.ready;
 }
@@ -131,11 +125,9 @@ function SendIcon() {
 
 export default function App() {
   const [draft, setDraft] = useState('');
-  const [showHistory, setShowHistory] = useState(false);
   const chat = useVoiceChat();
   const ui = UI[chat.lang];
-
-  const lastReply = [...chat.messages].reverse().find((message) => message.role === 'assistant')?.content;
+  const userLine = chat.interimTranscript || chat.transcript;
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -145,36 +137,27 @@ export default function App() {
     chat.sendText(text);
   };
 
-  const handleLanguageChange = (nextLang) => {
-    if (nextLang === chat.lang) return;
-    chat.changeLanguage(nextLang);
-    setDraft('');
-    setShowHistory(false);
-  };
-
   return (
-    <div className="app-bg min-h-screen text-slate-100">
-      <div className="fixed inset-x-0 top-0 z-50 border-b border-white/5 bg-slate-950/70 px-4 py-1.5 text-center text-[11px] text-slate-400 backdrop-blur">
+    <div className="app-bg flex h-dvh flex-col overflow-hidden text-slate-100">
+      <div className="shrink-0 border-b border-white/5 bg-slate-950/40 px-4 py-1 text-center text-[11px] leading-tight text-slate-400">
         {ui.notice}
       </div>
 
-      <main className="mx-auto flex min-h-screen w-full max-w-xl flex-col items-center px-4 pb-10 pt-12">
-        <header className="text-center">
-          <h1 className="text-sm font-semibold uppercase tracking-[0.25em] text-slate-300">{ui.title}</h1>
-          <p className="mt-1 text-xs text-slate-500">{ui.subtitle}</p>
-          <div
-            className="mt-3 flex justify-center"
-            role="group"
-            aria-label={ui.language}
-          >
-            <div className="flex gap-1 rounded-full border border-white/10 bg-white/5 p-1">
+      <main className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center overflow-hidden px-4 pb-3 pt-2">
+        <div className="relative flex w-full shrink-0 items-start justify-center">
+          <div className="text-center">
+            <h1 className="text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-300">{ui.title}</h1>
+            <p className="mt-0.5 text-[10px] text-slate-500">{ui.subtitle}</p>
+          </div>
+          <div className="absolute right-0 top-0" role="group" aria-label={ui.language}>
+            <div className="flex gap-0.5 rounded-full border border-white/10 bg-white/5 p-0.5">
               {LANGUAGES.map((code) => (
                 <button
                   key={code}
                   type="button"
-                  onClick={() => handleLanguageChange(code)}
+                  onClick={() => chat.changeLanguage(code)}
                   aria-pressed={chat.lang === code}
-                  className={`rounded-full px-3 py-1 text-[11px] font-medium tracking-wide transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-medium tracking-wide transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${
                     chat.lang === code ? 'bg-cyan-500/90 text-slate-950' : 'text-slate-400 hover:text-slate-100'
                   }`}
                 >
@@ -183,14 +166,16 @@ export default function App() {
               ))}
             </div>
           </div>
-        </header>
-
-        <div className="relative mt-6 w-[min(100%,420px,45.8vh)]">
-          <div className={`pointer-events-none absolute -inset-4 rounded-[3rem] blur-md transition-colors duration-500 ${HALO_STYLES[haloState(chat)]}`} />
-          <AvatarVideo isSpeaking={chat.isSpeaking} />
         </div>
 
-        <div className="mt-4 flex h-6 items-end justify-center gap-1.5" aria-hidden="true">
+        <div className="avatar-slot relative mt-2 flex min-h-0 w-full flex-1 items-center justify-center">
+          <div className={`avatar-fit relative aspect-[36/55]`}>
+            <div className={`pointer-events-none absolute -inset-3 rounded-[2.5rem] blur-md transition-colors duration-500 ${HALO_STYLES[haloState(chat)]}`} />
+            <AvatarVideo isSpeaking={chat.isSpeaking} />
+          </div>
+        </div>
+
+        <div className="mt-1 flex h-5 shrink-0 items-end justify-center gap-1.5" aria-hidden="true">
           {chat.isSpeaking && [0, 1, 2, 3, 4].map((index) => (
             <span
               key={index}
@@ -200,14 +185,22 @@ export default function App() {
           ))}
         </div>
 
-        <p className="mt-1 text-center text-xs text-slate-400" aria-live="polite">{statusLabel(chat, ui)}</p>
+        <p className="mt-0.5 text-center text-[11px] text-slate-400" aria-live="polite">{statusLabel(chat, ui)}</p>
 
-        <div className="mt-5 flex items-center justify-center gap-3">
+        <p className="mt-0.5 h-5 max-w-full truncate text-center text-[11px] italic text-slate-500" aria-live="off">
+          {userLine ? `${ui.you} ${userLine}` : ''}
+        </p>
+
+        <p className="line-clamp-3 mt-1 max-w-md text-center text-xs leading-snug text-slate-300" aria-live="polite">
+          {chat.lastReply || ui.hint}
+        </p>
+
+        <div className="mt-2 flex shrink-0 items-center justify-center gap-3">
           <button
             type="button"
             onClick={chat.isActive ? chat.hangUp : chat.startConversation}
             aria-label={chat.isActive ? ui.hangUp : ui.start}
-            className={`flex h-16 w-16 items-center justify-center rounded-full shadow-lg shadow-black/30 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
+            className={`flex h-14 w-14 items-center justify-center rounded-full shadow-lg shadow-black/30 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
               chat.isActive
                 ? 'bg-rose-500/90 text-white hover:bg-rose-500'
                 : 'bg-cyan-500 text-slate-950 hover:bg-cyan-400'
@@ -226,66 +219,36 @@ export default function App() {
         </div>
 
         {chat.error && (
-          <p className="mt-3 max-w-md text-center text-xs text-rose-300/90" role="alert">{ui.errors[chat.error]}</p>
+          <p className="mt-1 max-w-md text-center text-[11px] text-rose-300/90" role="alert">{ui.errors[chat.error]}</p>
         )}
 
-        <div className="mt-6 w-full max-w-lg text-center">
-          <p className="line-clamp-3 text-sm leading-relaxed text-slate-300" aria-live="polite">
-            {lastReply || ui.hint}
-          </p>
-          <button
-            type="button"
-            onClick={() => setShowHistory((visible) => !visible)}
-            aria-expanded={showHistory}
-            className="mt-2 text-xs text-slate-400 underline-offset-4 transition hover:text-slate-200 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
-          >
-            {showHistory ? ui.hideHistory : ui.viewHistory}
-          </button>
-
-          {showHistory && (
-            <div className="mt-3 max-h-56 space-y-2 overflow-y-auto rounded-2xl border border-white/10 bg-slate-900/80 p-3 text-left backdrop-blur">
-              {chat.messages.length === 0 && (
-                <p className="text-xs text-slate-500">{ui.emptyHistory}</p>
-              )}
-              {chat.messages.map((message, index) => (
-                <div
-                  key={`${index}-${message.role}`}
-                  className={`rounded-xl px-3 py-2 text-xs leading-relaxed ${
-                    message.role === 'assistant' ? 'bg-white/5 text-slate-200' : 'bg-cyan-500/10 text-cyan-100'
-                  }`}
-                >
-                  <span className="mr-2 font-semibold uppercase tracking-wide text-slate-500">
-                    {message.role === 'assistant' ? 'Jorge' : ui.you}
-                  </span>
-                  {message.content}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <form
-          onSubmit={handleSubmit}
-          className="mt-5 flex w-full max-w-md items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition focus-within:border-cyan-400/40"
-        >
-          <input
-            type="text"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            maxLength={500}
-            placeholder={ui.placeholder}
-            aria-label={ui.placeholder}
-            className="min-w-0 flex-1 bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-500"
-          />
-          <button
-            type="submit"
-            disabled={chat.isThinking || !draft.trim()}
-            aria-label={ui.send}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cyan-500/90 text-slate-950 transition hover:bg-cyan-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200 disabled:opacity-40"
-          >
-            <SendIcon />
-          </button>
-        </form>
+        {!chat.speechSupported && (
+          <div className="mt-1 w-full max-w-md shrink-0">
+            <p className="text-center text-[10px] text-amber-200/80">{ui.voiceOnlyNotice}</p>
+            <form
+              onSubmit={handleSubmit}
+              className="mt-1 flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5"
+            >
+              <input
+                type="text"
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                maxLength={500}
+                placeholder={ui.placeholder}
+                aria-label={ui.placeholder}
+                className="min-w-0 flex-1 bg-transparent text-xs text-slate-100 outline-none placeholder:text-slate-500"
+              />
+              <button
+                type="submit"
+                disabled={chat.isThinking || !draft.trim()}
+                aria-label={ui.send}
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cyan-500/90 text-slate-950 transition hover:bg-cyan-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200 disabled:opacity-40"
+              >
+                <SendIcon />
+              </button>
+            </form>
+          </div>
+        )}
       </main>
     </div>
   );

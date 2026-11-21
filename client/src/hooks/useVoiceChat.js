@@ -1,10 +1,22 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
 const API_URL = '/api/chat';
-export const GREETING = 'Hola, ¿qué tal? Soy Jorge, ¿en qué te puedo ayudar?';
+export const LANGUAGES = ['es', 'en', 'fr'];
+export const GREETINGS = {
+  es: 'Hola, ¿qué tal? Soy Jorge, ¿en qué te puedo ayudar?',
+  en: "Hi, how are you? I'm Jorge, how can I help you?",
+  fr: "Salut, ça va ? Je suis Jorge, comment puis-je t'aider ?",
+};
+const SPEECH_LANGS = { es: 'es-ES', en: 'en-GB', fr: 'fr-FR' };
+const FALLBACK_REPLIES = {
+  es: 'No he entendido eso.',
+  en: 'I did not understand that.',
+  fr: "Je n'ai pas compris.",
+};
 const MAX_HISTORY = 6;
 
 export default function useVoiceChat() {
+  const [lang, setLang] = useState('es');
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
@@ -14,6 +26,7 @@ export default function useVoiceChat() {
   const [messages, setMessages] = useState([]);
   const [error, setError] = useState(null);
 
+  const langRef = useRef('es');
   const recognitionRef = useRef(null);
   const audioRef = useRef(null);
   const shouldListenRef = useRef(false);
@@ -74,6 +87,19 @@ export default function useVoiceChat() {
     });
   }, [setSpeaking]);
 
+  const beginGreeting = useCallback((language) => {
+    shouldListenRef.current = true;
+    isThinkingRef.current = false;
+    setIsThinking(false);
+    setError(null);
+    setTranscript('');
+    const greetingMessage = { role: 'assistant', content: GREETINGS[language] };
+    messagesRef.current = [greetingMessage];
+    setMessages([greetingMessage]);
+    setIsActive(true);
+    playAudio(`/assets/saludo-${language}.mp3`);
+  }, [playAudio]);
+
   const sendToBackend = useCallback(async (text) => {
     const clean = text.trim();
     if (!clean) return;
@@ -92,7 +118,7 @@ export default function useVoiceChat() {
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: clean, history }),
+        body: JSON.stringify({ message: clean, history, lang: langRef.current }),
       });
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -100,7 +126,7 @@ export default function useVoiceChat() {
       const data = await response.json();
       const replyText = typeof data.text === 'string' && data.text
         ? data.text
-        : 'No he entendido eso.';
+        : FALLBACK_REPLIES[langRef.current];
 
       const assistantMessage = { role: 'assistant', content: replyText };
       messagesRef.current = [...messagesRef.current, assistantMessage].slice(-(MAX_HISTORY * 2));
@@ -109,7 +135,7 @@ export default function useVoiceChat() {
       if (data.audioBase64) playAudio(`data:audio/mpeg;base64,${data.audioBase64}`);
     } catch (err) {
       console.error('Error al consultar a Jorge:', err?.message ?? 'desconocido');
-      setError('No se pudo conectar con Jorge. Inténtalo de nuevo.');
+      setError('connection');
       if (shouldListenRef.current) safeStart();
     } finally {
       setIsThinking(false);
@@ -121,12 +147,12 @@ export default function useVoiceChat() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      setError('Tu navegador no soporta reconocimiento de voz. Usa Chrome o Edge, o escribe tu pregunta.');
+      setError('speechUnsupported');
       return undefined;
     }
 
     const recognition = new SpeechRecognition();
-    recognition.lang = 'es-ES';
+    recognition.lang = SPEECH_LANGS[langRef.current];
     recognition.continuous = true;
     recognition.interimResults = false;
 
@@ -153,12 +179,12 @@ export default function useVoiceChat() {
     recognition.onerror = (event) => {
       if (event.error === 'no-speech' || event.error === 'aborted') return;
       if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-        setError('Permiso de micrófono denegado. Puedes usar el campo de texto.');
+        setError('micDenied');
         shouldListenRef.current = false;
         return;
       }
       console.error('Error de reconocimiento:', event.error);
-      setError('Hubo un problema con el micrófono. Puedes usar el campo de texto.');
+      setError('micError');
     };
 
     recognitionRef.current = recognition;
@@ -175,6 +201,10 @@ export default function useVoiceChat() {
   }, [safeStart, sendToBackend]);
 
   useEffect(() => {
+    if (recognitionRef.current) recognitionRef.current.lang = SPEECH_LANGS[lang];
+  }, [lang]);
+
+  useEffect(() => {
     if (isSpeaking) {
       setIsPaused(true);
       try { recognitionRef.current?.stop(); } catch { /* noop */ }
@@ -185,16 +215,29 @@ export default function useVoiceChat() {
   }, [isSpeaking, safeStart]);
 
   const startConversation = useCallback(() => {
-    shouldListenRef.current = true;
+    beginGreeting(langRef.current);
+  }, [beginGreeting]);
+
+  const changeLanguage = useCallback((nextLang) => {
+    if (!LANGUAGES.includes(nextLang) || nextLang === langRef.current) return;
+
+    langRef.current = nextLang;
+    setLang(nextLang);
+    shouldListenRef.current = false;
     isThinkingRef.current = false;
-    setIsThinking(false);
-    setError(null);
-    setTranscript('');
-    setMessages([{ role: 'assistant', content: GREETING }]);
-    messagesRef.current = [{ role: 'assistant', content: GREETING }];
-    setIsActive(true);
-    playAudio('/assets/saludo.mp3');
-  }, [playAudio]);
+    clearTimeout(startRetryRef.current);
+    try { recognitionRef.current?.abort(); } catch { /* noop */ }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    setSpeaking(false);
+    setIsListening(false);
+    setIsPaused(false);
+    setMessages([]);
+    messagesRef.current = [];
+    beginGreeting(nextLang);
+  }, [beginGreeting, setSpeaking]);
 
   const stopListening = useCallback(() => {
     shouldListenRef.current = false;
@@ -231,6 +274,7 @@ export default function useVoiceChat() {
   }, [sendToBackend]);
 
   return {
+    lang,
     isListening,
     isSpeaking,
     isThinking,
@@ -240,6 +284,7 @@ export default function useVoiceChat() {
     messages,
     error,
     startConversation,
+    changeLanguage,
     stopListening,
     stopAudio,
     hangUp,

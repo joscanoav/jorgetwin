@@ -22,6 +22,47 @@ const ttsModule = await import('msedge-tts');
 const MsEdgeTTS = ttsModule.MsEdgeTTS ?? ttsModule.default?.MsEdgeTTS;
 const OUTPUT_FORMAT = ttsModule.OUTPUT_FORMAT ?? ttsModule.default?.OUTPUT_FORMAT;
 
+const ALLOWED_LANGUAGES = new Set(['es', 'en', 'fr']);
+const TTS_VOICES = {
+  es: 'es-ES-AlvaroNeural',
+  en: 'en-GB-RyanNeural',
+  fr: 'fr-FR-HenriNeural',
+};
+const LANGUAGE_INSTRUCTIONS = {
+  es: 'Responde siempre en español de España.',
+  en: 'Always reply in English. Use simple A2-B1 sentences and gently correct the student language mistakes. Do not switch to Spanish unless the user explicitly asks.',
+  fr: "Réponds toujours en français. Utilise des phrases simples de niveau A2-B1 et corrige gentiment les erreurs de l'élève. Ne passe pas à l'espagnol sauf demande explicite.",
+};
+const FALLBACK_REPLIES = {
+  es: 'No he entendido eso.',
+  en: 'I did not understand that.',
+  fr: "Je n'ai pas compris.",
+};
+
+async function resolveVoice(locale, preferred) {
+  const tts = new MsEdgeTTS();
+  try {
+    const voices = await tts.getVoices();
+    return voices.find((voice) => voice.Locale === locale && voice.Gender === 'Male' && voice.ShortName === preferred)?.ShortName
+      || voices.find((voice) => voice.Locale === locale && voice.Gender === 'Male' && voice.ShortName.endsWith('Neural'))?.ShortName
+      || preferred;
+  } catch {
+    return preferred;
+  } finally {
+    tts.close();
+  }
+}
+
+const [esVoice, enVoice, frVoice] = await Promise.all([
+  resolveVoice('es-ES', TTS_VOICES.es),
+  resolveVoice('en-GB', TTS_VOICES.en),
+  resolveVoice('fr-FR', TTS_VOICES.fr),
+]);
+TTS_VOICES.es = esVoice;
+TTS_VOICES.en = enVoice;
+TTS_VOICES.fr = frVoice;
+console.log(`[voces] es=${esVoice} en=${enVoice} fr=${frVoice}`);
+
 const app = express();
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
@@ -49,8 +90,11 @@ function validateChatBody(body) {
     return 'Cuerpo de la solicitud no válido';
   }
 
-  const { message, history = [] } = body;
+  const { message, history = [], lang } = body;
 
+  if (lang !== undefined && !ALLOWED_LANGUAGES.has(lang)) {
+    return '"lang" debe ser exactamente "es", "en" o "fr"';
+  }
   if (typeof message !== 'string' || !message.trim()) {
     return 'El campo "message" debe ser un texto no vacío';
   }
@@ -98,7 +142,7 @@ function sanitizeForSpeech(text) {
     .trim();
 }
 
-async function textToSpeechBase64(text) {
+async function textToSpeechBase64(text, lang) {
   const tts = new MsEdgeTTS({
     connectionTimeoutMs: 10_000,
     synthesisTimeoutMs: 20_000,
@@ -107,7 +151,7 @@ async function textToSpeechBase64(text) {
 
   try {
     await tts.setMetadata(
-      'es-ES-AlvaroNeural',
+      TTS_VOICES[lang],
       OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3
     );
 
@@ -142,7 +186,7 @@ app.post('/api/chat', async (req, res) => {
     return res.status(400).json({ error: validationError });
   }
 
-  const { message, history = [] } = req.body;
+  const { message, history = [], lang = 'es' } = req.body;
 
   if (!process.env.GROQ_API_KEY) {
     return res.status(503).json({ error: 'Servidor sin configurar: falta GROQ_API_KEY' });
@@ -151,7 +195,7 @@ app.post('/api/chat', async (req, res) => {
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
   const messages = [
-    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: `${SYSTEM_PROMPT}\n\n${LANGUAGE_INSTRUCTIONS[lang]}` },
     ...history.map(({ role, content }) => ({ role, content })),
     { role: 'user', content: message },
   ];
@@ -167,8 +211,8 @@ app.post('/api/chat', async (req, res) => {
       temperature: 0.3,
     });
     groqMs = Math.round(performance.now() - groqStartedAt);
-    const rawReply = completion.choices[0]?.message?.content?.trim() || 'No he entendido eso.';
-    replyText = sanitizeForSpeech(rawReply) || 'No he entendido eso.';
+    const rawReply = completion.choices[0]?.message?.content?.trim() || FALLBACK_REPLIES[lang];
+    replyText = sanitizeForSpeech(rawReply) || FALLBACK_REPLIES[lang];
   } catch (err) {
     console.error('[api/chat] error de Groq:', err?.status ?? err?.name ?? 'desconocido');
     console.log(`[api/chat] groq=${groqMs}ms tts=0ms total=${Math.round(performance.now() - startedAt)}ms`);
@@ -178,7 +222,7 @@ app.post('/api/chat', async (req, res) => {
   let audioBase64 = null;
   const ttsStartedAt = performance.now();
   try {
-    audioBase64 = await textToSpeechBase64(replyText);
+    audioBase64 = await textToSpeechBase64(replyText, lang);
   } catch (err) {
     console.error('[api/chat] error de TTS:', err?.message === 'TTS_TIMEOUT' ? 'timeout' : 'desconocido');
   } finally {

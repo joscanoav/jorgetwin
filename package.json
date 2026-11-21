@@ -1,0 +1,21 @@
+{
+  "name": "jorgetwin",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "npm install --prefix client && npm run build --prefix client",
+    "start": "node server/index.js",
+    "greeting": "node scripts/generate-greeting.mjs"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.10",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.5",
+    "groq-sdk": "^1.6.0",
+    "msedge-tts": "^2.1.1"
+  }
+}

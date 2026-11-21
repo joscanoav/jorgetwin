@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+}
+
+.app-bg {
+  background: radial-gradient(ellipse 100% 65% at 50% 0%, #1e293b 0%, #0f172a 45%, #020617 100%);
+}
+
+@keyframes halo-breathe {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.03); }
+}
+
+@keyframes halo-listen {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.07); }
+}
+
+@keyframes halo-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes wave {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+
+.halo-idle {
+  animation: halo-breathe 6s ease-in-out infinite;
+}
+
+.halo-listening {
+  animation: halo-listen 1.6s ease-in-out infinite;
+}
+
+.halo-thinking {
+  background: conic-gradient(from 0deg, rgba(56, 189, 248, 0.04), rgba(56, 189, 248, 0.4), rgba(56, 189, 248, 0.04), rgba(56, 189, 248, 0.4), rgba(56, 189, 248, 0.04));
+  animation: halo-spin 9s linear infinite;
+}
+
+.halo-speaking {
+  animation: halo-listen 1.2s ease-in-out infinite;
+}
+
+.wave-bar {
+  animation: wave 900ms ease-in-out infinite;
+  transform-origin: bottom;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .halo-idle,
+  .halo-listening,
+  .halo-thinking,
+  .halo-speaking,
+  .wave-bar {
+    animation: none;
+  }
+}

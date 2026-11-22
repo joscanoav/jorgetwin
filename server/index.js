@@ -95,6 +95,8 @@ app.get('/health', (_req, res) => {
 const MAX_MESSAGE_LENGTH = 500;
 const MAX_HISTORY_LENGTH = 6;
 const ALLOWED_ROLES = new Set(['user', 'assistant']);
+const GROQ_TIMEOUT_MS = 25_000;
+const GROQ_MAX_COMPLETION_TOKENS = 1500;
 
 function validateChatBody(body) {
   if (!body || typeof body !== 'object') {
@@ -143,6 +145,10 @@ function escapeXml(text) {
 
 function sanitizeForSpeech(text) {
   return String(text)
+    .replace(/https?:\/\/\S+/gi, '')
+    .replace(/www\.\S+/gi, '')
+    .replace(/【[^】]*】/g, '')
+    .replace(/\[\d+\]/g, '')
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     .replace(/^\s*[-*+]\s+/gm, '')
     .replace(/^\s*#{1,6}\s*/gm, '')
@@ -187,10 +193,41 @@ async function textToSpeechBase64(text, lang) {
   }
 }
 
+function supportsBrowserSearch(model) {
+  return typeof model === 'string' && model.startsWith('openai/gpt-oss-');
+}
+
+function extractExecutedToolNames(completion) {
+  const names = new Set();
+  const executedTools = completion?.choices?.[0]?.message?.executed_tools;
+  if (!Array.isArray(executedTools)) return names;
+  for (const tool of executedTools) {
+    const name = tool?.name || tool?.type || tool?.function?.name;
+    if (typeof name === 'string' && name) names.add(name);
+  }
+  return names;
+}
+
+async function createGroqCompletion(groq, { model, messages, useBrowserSearch }) {
+  const request = {
+    model,
+    messages,
+    reasoning_effort: 'low',
+    max_completion_tokens: GROQ_MAX_COMPLETION_TOKENS,
+    temperature: 0.3,
+  };
+  if (useBrowserSearch) {
+    request.tools = [{ type: 'browser_search' }];
+    request.tool_choice = 'auto';
+  }
+  return groq.chat.completions.create(request, { timeout: GROQ_TIMEOUT_MS });
+}
+
 app.post('/api/chat', async (req, res) => {
   const startedAt = performance.now();
   let groqMs = 0;
   let ttsMs = 0;
+  let searchUsed = false;
 
   const validationError = validateChatBody(req.body);
   if (validationError) {
@@ -204,8 +241,10 @@ app.post('/api/chat', async (req, res) => {
   }
 
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  const model = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
+  const useBrowserSearch = supportsBrowserSearch(model);
 
-  const messages = [
+  const baseMessages = [
     { role: 'system', content: `${SYSTEM_PROMPT}\n\n${LANGUAGE_INSTRUCTIONS[lang]}` },
     ...history.map(({ role, content }) => ({ role, content })),
     { role: 'user', content: message },
@@ -214,20 +253,29 @@ app.post('/api/chat', async (req, res) => {
   let replyText;
   try {
     const groqStartedAt = performance.now();
-    const completion = await groq.chat.completions.create({
-      model: process.env.GROQ_MODEL || 'openai/gpt-oss-20b',
-      messages,
-      reasoning_effort: 'low',
-      max_completion_tokens: 400,
-      temperature: 0.3,
-    });
+    let completion;
+    try {
+      completion = await createGroqCompletion(groq, { model, messages: baseMessages, useBrowserSearch });
+    } catch (err) {
+      if (!useBrowserSearch) throw err;
+      console.error('[api/chat] reintento Groq sin búsqueda:', err?.status ?? err?.name ?? 'desconocido');
+      completion = await createGroqCompletion(groq, {
+        model,
+        messages: [
+          ...baseMessages,
+          { role: 'system', content: 'No has podido consultar internet ahora mismo. Dilo con claridad y naturalidad en 2 o 3 frases, sin inventar datos recientes.' },
+        ],
+        useBrowserSearch: false,
+      });
+    }
     groqMs = Math.round(performance.now() - groqStartedAt);
+    searchUsed = extractExecutedToolNames(completion).has('browser_search');
     const rawReply = completion.choices[0]?.message?.content?.trim() || FALLBACK_REPLIES[lang];
     replyText = sanitizeForSpeech(rawReply) || FALLBACK_REPLIES[lang];
   } catch (err) {
     console.error('[api/chat] error de Groq:', err?.status ?? err?.name ?? 'desconocido');
-    console.log(`[api/chat] groq=${groqMs}ms tts=0ms total=${Math.round(performance.now() - startedAt)}ms`);
-    return res.status(502).json({ error: 'No se pudo generar la respuesta' });
+    groqMs = groqMs || Math.round(performance.now() - startedAt);
+    replyText = sanitizeForSpeech(FALLBACK_REPLIES[lang]) || FALLBACK_REPLIES[lang];
   }
 
   let audioBase64 = null;
@@ -240,7 +288,7 @@ app.post('/api/chat', async (req, res) => {
     ttsMs = Math.round(performance.now() - ttsStartedAt);
   }
 
-  console.log(`[api/chat] groq=${groqMs}ms tts=${ttsMs}ms total=${Math.round(performance.now() - startedAt)}ms`);
+  console.log(`[api/chat] groq=${groqMs}ms tts=${ttsMs}ms total=${Math.round(performance.now() - startedAt)}ms search=${searchUsed ? 'yes' : 'no'}`);
   res.json({ text: replyText, audioBase64 });
 });
 

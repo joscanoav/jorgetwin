@@ -8,7 +8,7 @@ Enlace web donde un alumno entra, ve mi cara, oye "Hola, ¿qué tal? Soy Jorge, 
 - Backend: Node 18+, Express 5, groq-sdk, msedge-tts (es-ES-AlvaroNeural, en-GB-RyanNeural, fr-FR-HenriNeural), express-rate-limit, dotenv.
 - Frontend: React + Vite + TailwindCSS. Web Speech API (STT, solo Chrome/Edge) + campo de texto únicamente como alternativa si el navegador no soporta SpeechRecognition.
 - Reconocimiento de voz: Google (Chrome) o Microsoft (Edge). Mejor comportamiento observado en Edge para inglés.
-- LLM: Groq, modelo por variable GROQ_MODEL (por defecto openai/gpt-oss-20b; alternativa openai/gpt-oss-120b). reasoning_effort "low".
+- LLM: Groq, modelo por variable GROQ_MODEL (por defecto openai/gpt-oss-20b; alternativa openai/gpt-oss-120b). reasoning_effort "low". Para modelos openai/gpt-oss-*, se habilita browser_search de Groq (tool_choice auto) para consultas de actualidad; límite de salida ampliado para permitir razonamiento+búsqueda, manteniendo brevedad por prompt.
 - Sin base de datos. Sin persistencia. No se guardan conversaciones.
 
 ## Estructura
@@ -31,7 +31,7 @@ Imagen fija en reposo + vídeo MP4 corto mío hablando (HeyGen), mudo y en bucle
 - max_tokens bajo corta frases y rompe modelos con razonamiento.
 
 ## Privacidad
-Alumnos menores. Aviso visible: "Soy una IA, clon de Jorge. No escribas datos personales." Voz → Google (Web Speech), texto → Groq y Microsoft. Pendiente: autorización del centro / DPD y consentimiento familiar (menores de 14).
+Alumnos menores. Aviso visible: "Soy una IA, clon de Jorge. No escribas datos personales." Voz → Google (Web Speech), texto → Groq y Microsoft. Las preguntas pueden salir a la web a través de Groq cuando se usa browser_search para actualidad. Pendiente: autorización del centro / DPD y consentimiento familiar (menores de 14).
 
 ## Fases futuras (NO hacer ahora)
 Sincronía de boca con volumen · temario con RAG · voz clonada · más modelos.
